@@ -29,7 +29,7 @@
         </slot>
 
         <svg class="connections-container">
-            <g v-for="connection in connections" :key="connection.id + counter.toString()">
+            <g v-for="connection in visibleConnections" :key="connection.id + counter.toString()">
                 <slot name="connection" :connection="connection">
                     <ConnectionWrapper :connection="connection" />
                 </slot>
@@ -48,15 +48,17 @@
                     <slot
                         name="node"
                         :node="node"
-                        :selected="selectedNodes.includes(node)"
+                        :selected="selectedNodeSet.has(node)"
                         :dragging="dragMoves[idx].dragging.value"
+                        :visible="visibleNodeIds.has(node.id)"
                         @select="selectNode(node)"
                         @start-drag="startDrag"
                     >
                         <Node
                             :node="node"
-                            :selected="selectedNodes.includes(node)"
+                            :selected="selectedNodeSet.has(node)"
                             :dragging="dragMoves[idx].dragging.value"
+                            :visible="visibleNodeIds.has(node.id)"
                             @select="selectNode(node)"
                             @start-drag="startDrag"
                         />
@@ -89,9 +91,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide, Ref, ref, toRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, provide, Ref, ref, toRef } from "vue";
 
-import { AbstractNode } from "@baklavajs/core";
+import { AbstractNode, Connection } from "@baklavajs/core";
 import { IBaklavaViewModel } from "../viewModel";
 import { providePlugin, useDragMove } from "../utility";
 import { usePanZoom } from "./panZoom";
@@ -123,6 +125,79 @@ const nodes = computed(() => props.viewModel.displayedGraph.nodes);
 const dragMoves = computed(() => props.viewModel.displayedGraph.nodes.map((n) => useDragMove(toRef(n, "position"))));
 const connections = computed(() => props.viewModel.displayedGraph.connections);
 const selectedNodes = computed(() => props.viewModel.displayedGraph.selectedNodes);
+const selectedNodeSet = computed(() => new Set(props.viewModel.displayedGraph.selectedNodes));
+
+const triggerViewportUpdate = ref(0);
+
+const viewportBounds = computed(() => {
+    void triggerViewportUpdate.value;
+    const g = props.viewModel.displayedGraph;
+    const scaling = g.scaling;
+    const panning = g.panning;
+    if (!el.value) return null;
+    const viewWidth = el.value.clientWidth;
+    const viewHeight = el.value.clientHeight;
+    return {
+        minX: -panning.x - viewWidth / scaling,
+        maxX: -panning.x,
+        minY: -panning.y - viewHeight / scaling,
+        maxY: -panning.y,
+    };
+});
+
+const visibleNodeIds = computed(() => {
+    const bounds = viewportBounds.value;
+    if (!bounds) return new Set(nodes.value.map((n) => n.id));
+    const margin = 500;
+    const defaultWidth = props.viewModel.settings.nodes.defaultWidth;
+    const s = new Set<string>();
+    for (const n of nodes.value) {
+        const p = n.position;
+        if (!p) {
+            s.add(n.id);
+            continue;
+        }
+        const w = n.width ?? defaultWidth;
+        if (
+            p.x + w + margin >= bounds.minX &&
+            p.x - margin <= bounds.maxX &&
+            p.y + 400 + margin >= bounds.minY &&
+            p.y - margin <= bounds.maxY
+        ) {
+            s.add(n.id);
+        }
+    }
+    return s;
+});
+
+const nodeMap = computed(() => {
+    const m = new Map<string, AbstractNode>();
+    for (const n of nodes.value) {
+        m.set(n.id, n);
+    }
+    return m;
+});
+
+const visibleConnections = computed(() => {
+    const bounds = viewportBounds.value;
+    if (!bounds) return connections.value;
+    const padding = 500;
+    const nm = nodeMap.value;
+    return connections.value.filter((conn: Connection) => {
+        const fromNode = nm.get(conn.from.nodeId);
+        const toNode = nm.get(conn.to.nodeId);
+        if (!fromNode || !toNode) return false;
+        if (fromNode.collapsed || toNode.collapsed) return false;
+        const fp = fromNode.position;
+        const tp = toNode.position;
+        if (!fp || !tp) return true;
+        if (fp.x + padding < bounds.minX && tp.x + padding < bounds.minX) return false;
+        if (fp.x > bounds.maxX + padding && tp.x > bounds.maxX + padding) return false;
+        if (fp.y + padding < bounds.minY && tp.y + padding < bounds.minY) return false;
+        if (fp.y > bounds.maxY + padding && tp.y > bounds.maxY + padding) return false;
+        return true;
+    });
+});
 
 const panZoom = usePanZoom();
 const temporaryConnection = provideTemporaryConnection();
@@ -182,7 +257,7 @@ const selectNode = (node: AbstractNode) => {
     if (!isMultiSelectModifierPressed) {
         unselectAllNodes();
     }
-    if (!selectedNodes.value.includes(node)) {
+    if (!selectedNodeSet.value.has(node)) {
         props.viewModel.displayedGraph.selectedNodes.push(node);
     } else if (isMultiSelectModifierPressed) {
         const idx = selectedNodes.value.indexOf(node);
@@ -217,4 +292,22 @@ const stopDrag = () => {
 
     document.removeEventListener("pointerup", stopDrag);
 };
+
+let editorResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+    if (el.value) {
+        editorResizeObserver = new ResizeObserver(() => {
+            triggerViewportUpdate.value++;
+        });
+        editorResizeObserver.observe(el.value);
+    }
+});
+
+onBeforeUnmount(() => {
+    if (editorResizeObserver) {
+        editorResizeObserver.disconnect();
+        editorResizeObserver = null;
+    }
+});
 </script>

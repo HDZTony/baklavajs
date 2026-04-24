@@ -16,6 +16,7 @@ declare module "@baklavajs/core/node" {
         disablePointerEvents: boolean;
         twoColumn: boolean;
         reverseY?: boolean;
+        collapsed?: boolean;
     }
 }
 

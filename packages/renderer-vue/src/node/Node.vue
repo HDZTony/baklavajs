@@ -8,7 +8,7 @@
         :data-node-type="node.type"
         @pointerdown="select"
     >
-        <div v-if="viewModel.settings.nodes.resizable" class="__resize-handle" @mousedown="startResize" />
+        <div v-if="viewModel.settings.nodes.resizable && !isCollapsed" class="__resize-handle" @mousedown="startResize" />
 
         <slot name="title">
             <div class="__title" @pointerdown.self.stop="startDrag" @contextmenu.prevent="openContextMenu">
@@ -17,6 +17,14 @@
                         {{ node.title }}
                     </div>
                     <div class="__menu">
+                        <svg class="__collapse-btn --clickable" viewBox="0 0 16 16" width="14" height="14" @click.stop="toggleCollapse" :title="isCollapsed ? 'Expand' : 'Collapse'">
+                            <rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor" />
+                            <template v-if="!isCollapsed">
+                                <rect x="2" y="7" width="12" height="2" rx="1" fill="currentColor" />
+                                <rect x="2" y="11" width="12" height="2" rx="1" fill="currentColor" />
+                            </template>
+                            <rect v-else x="5" y="7" width="6" height="2" rx="1" fill="currentColor" />
+                        </svg>
                         <vertical-dots class="--clickable" @click="openContextMenu" />
                         <context-menu
                             v-model="showContextMenu"
@@ -40,7 +48,7 @@
             </div>
         </slot>
 
-        <slot name="content">
+        <slot v-if="isVisible && !isCollapsed" name="content">
             <div class="__content" :class="classesContent" @keydown.delete.stop>
                 <!-- Outputs -->
                 <div class="__outputs">
@@ -77,8 +85,9 @@ const props = withDefaults(
         node: AbstractNode;
         selected?: boolean;
         dragging?: boolean;
+        visible?: boolean;
     }>(),
-    { selected: false },
+    { selected: false, visible: true },
 );
 
 const emit = defineEmits<{
@@ -102,6 +111,7 @@ const contextMenuItems = computed(() => {
     const items = [
         { value: "rename", label: "Rename" },
         { value: "delete", label: "Delete" },
+        { value: "collapse", label: isCollapsed.value ? "Expand" : "Collapse" },
     ];
 
     if (props.node.type.startsWith(GRAPH_NODE_TYPE_PREFIX)) {
@@ -115,7 +125,22 @@ const classes = computed(() => ({
     "--selected": props.selected,
     "--dragging": props.dragging,
     "--two-column": !!props.node.twoColumn,
+    "--collapsed": isCollapsed.value,
+    "--offscreen": !props.visible,
 }));
+
+const isVisible = computed(() => props.visible);
+
+const isCollapsed = computed({
+    get: () => !!props.node.collapsed,
+    set: (v: boolean) => {
+        props.node.collapsed = v;
+    },
+});
+
+const toggleCollapse = () => {
+    isCollapsed.value = !isCollapsed.value;
+};
 
 const classesContent = computed(() => ({
     "--reverse-y": props.node.reverseY ?? viewModel.value.settings.nodes.reverseY,
@@ -156,6 +181,9 @@ const onContextMenuClick = async (action: string) => {
             renaming.value = true;
             await nextTick();
             renameInputEl.value?.focus();
+            break;
+        case "collapse":
+            toggleCollapse();
             break;
         case "editSubgraph":
             switchGraph((props.node as AbstractNode & IGraphNode).template);

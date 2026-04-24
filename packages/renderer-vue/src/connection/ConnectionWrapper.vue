@@ -56,7 +56,7 @@ export default defineComponent({
             if (from.node && to.node) {
                 if (!resizeObserver) {
                     resizeObserver = new ResizeObserver(() => {
-                        updateCoords();
+                        scheduleUpdate();
                     });
                     resizeObserver.observe(from.node);
                     resizeObserver.observe(to.node);
@@ -67,18 +67,31 @@ export default defineComponent({
             d.value = { x1, y1, x2, y2 };
         };
 
+        let rafId: number | null = null;
+        const scheduleUpdate = () => {
+            if (rafId !== null) return;
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                updateCoords();
+            });
+        };
+
         onMounted(async () => {
             await nextTick();
             updateCoords();
         });
 
         onBeforeUnmount(() => {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
             if (resizeObserver) {
                 resizeObserver.disconnect();
             }
         });
 
-        watch([fromNodePosition, toNodePosition], () => updateCoords(), { deep: true });
+        watch([fromNodePosition, toNodePosition], () => scheduleUpdate(), { deep: true });
 
         return { d, state };
     },

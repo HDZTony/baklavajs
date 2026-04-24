@@ -15,4 +15,5 @@ export function setViewNodeProperties(node: AbstractNode, settings: SetViewNodeP
     node.disablePointerEvents = false;
     node.twoColumn = node.twoColumn ?? false;
     node.width = node.width ?? settings.defaultWidth;
+    node.collapsed = node.collapsed ?? false;
 }

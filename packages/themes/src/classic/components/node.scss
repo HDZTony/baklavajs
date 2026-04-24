@@ -125,4 +125,21 @@
             );
         }
     }
+
+    &.--collapsed {
+        & > .__title {
+            border-radius: var(--baklava-node-border-radius);
+        }
+    }
+
+    & .__collapse-btn {
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity var(--baklava-visual-transition);
+        flex-shrink: 0;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
 }
