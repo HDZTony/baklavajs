@@ -8,7 +8,7 @@
         :data-node-type="node.type"
         @pointerdown="select"
     >
-        <div v-if="viewModel.settings.nodes.resizable && !isCollapsed" class="__resize-handle" @mousedown="startResize" />
+        <div v-if="viewModel.settings.nodes.resizable" class="__resize-handle" @mousedown="startResize" />
 
         <slot name="title">
             <div class="__title" @pointerdown.self.stop="startDrag" @contextmenu.prevent="openContextMenu">
@@ -48,7 +48,7 @@
             </div>
         </slot>
 
-        <slot v-if="isVisible && !isCollapsed" name="content">
+        <slot v-if="isVisible" name="content">
             <div class="__content" :class="classesContent" @keydown.delete.stop>
                 <!-- Outputs -->
                 <div class="__outputs">
@@ -111,7 +111,6 @@ const contextMenuItems = computed(() => {
     const items = [
         { value: "rename", label: "Rename" },
         { value: "delete", label: "Delete" },
-        { value: "collapse", label: isCollapsed.value ? "Expand" : "Collapse" },
     ];
 
     if (props.node.type.startsWith(GRAPH_NODE_TYPE_PREFIX)) {
@@ -125,7 +124,7 @@ const classes = computed(() => ({
     "--selected": props.selected,
     "--dragging": props.dragging,
     "--two-column": !!props.node.twoColumn,
-    "--collapsed": isCollapsed.value,
+    "--collapsed": false,
     "--offscreen": !props.visible,
 }));
 
@@ -181,9 +180,6 @@ const onContextMenuClick = async (action: string) => {
             renaming.value = true;
             await nextTick();
             renameInputEl.value?.focus();
-            break;
-        case "collapse":
-            toggleCollapse();
             break;
         case "editSubgraph":
             switchGraph((props.node as AbstractNode & IGraphNode).template);
