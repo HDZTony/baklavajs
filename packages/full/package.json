@@ -25,7 +25,7 @@
         "build:cjs": "esbuild src/index.ts src/bundle.ts --outdir=dist/cjs --format=cjs --sourcemap",
         "build:types": "tsc -p tsconfig.build.json",
         "build:browser": "esbuild src/bundle.ts --bundle --minify --sourcemap --global-name=BaklavaJS --outfile=dist/bundle.js",
-        "build": "rimraf dist && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types && echo '{\"type\":\"module\"}' > dist/esm/package.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json && pnpm run build:browser"
+        "build": "rimraf dist && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types && node -e \"require('fs').writeFileSync('dist/esm/package.json','{\\\"type\\\":\\\"module\\\"}')\" && node -e \"require('fs').writeFileSync('dist/cjs/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\" && pnpm run build:browser"
     },
     "repository": {
         "type": "git",

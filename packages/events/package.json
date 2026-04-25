@@ -23,7 +23,7 @@
         "build:esm": "esbuild src/*.ts --outdir=dist/esm --format=esm --sourcemap",
         "build:cjs": "esbuild src/*.ts --outdir=dist/cjs --format=cjs --sourcemap",
         "build:types": "tsc -p tsconfig.build.json",
-        "build": "rimraf dist && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types && echo '{\"type\":\"module\"}' > dist/esm/package.json && echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json"
+        "build": "rimraf dist && pnpm run build:esm && pnpm run build:cjs && pnpm run build:types && node -e \"require('fs').writeFileSync('dist/esm/package.json','{\\\"type\\\":\\\"module\\\"}')\" && node -e \"require('fs').writeFileSync('dist/cjs/package.json','{\\\"type\\\":\\\"commonjs\\\"}')\""
     },
     "publishConfig": {
         "access": "public"
