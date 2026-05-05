@@ -15,7 +15,7 @@ export function usePanZoom() {
 
     const styles = computed(() => ({
         "transform-origin": "0 0",
-        "transform": `scale(${graph.value.scaling}) translate(${graph.value.panning.x}px, ${graph.value.panning.y}px)`,
+        "transform": `scale(${graph.value.scaling}) translate3d(${graph.value.panning.x}px, ${graph.value.panning.y}px, 0)`,
     }));
 
     const applyZoom = (centerX: number, centerY: number, newScale: number) => {

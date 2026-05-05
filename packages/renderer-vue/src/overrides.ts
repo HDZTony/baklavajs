@@ -13,6 +13,8 @@ declare module "@baklavajs/core/node" {
     interface AbstractNode {
         position: { x: number; y: number };
         width: number;
+        /** Optional fixed min-height (px); omit or undefined = grow with content */
+        height?: number;
         disablePointerEvents: boolean;
         twoColumn: boolean;
         reverseY?: boolean;

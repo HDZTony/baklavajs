@@ -91,12 +91,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide, Ref, ref, toRef } from "vue";
+import { computed, onBeforeUnmount, onMounted, provide, ref, Ref, toRef, nextTick } from "vue";
 
 import { AbstractNode, Connection } from "@baklavajs/core";
 import { IBaklavaViewModel } from "../viewModel";
-import { providePlugin, useDragMove } from "../utility";
+import { providePlugin, useDragMove, useGraph } from "../utility";
 import { usePanZoom } from "./panZoom";
+import {
+    VIEWPORT_MARGIN_PX,
+    aabbIntersectsRect,
+    graphViewportInflated,
+    isNodeCollapsed,
+    nodeAxisAlignedBox,
+} from "./viewportCulling";
 import { provideTemporaryConnection } from "./temporaryConnection";
 import { useContextMenu } from "./contextMenu";
 import { useSelectionBox } from "./selectionBox";
@@ -127,7 +134,72 @@ const connections = computed(() => props.viewModel.displayedGraph.connections);
 const selectedNodes = computed(() => props.viewModel.displayedGraph.selectedNodes);
 const selectedNodeSet = computed(() => new Set(props.viewModel.displayedGraph.selectedNodes));
 
-const visibleNodeIds = computed(() => new Set(nodes.value.map((n) => n.id)));
+const { graph } = useGraph();
+const editorSize = ref({ w: 0, h: 0 });
+let editorResizeObserver: ResizeObserver | null = null;
+
+onMounted(() => {
+    void nextTick(() => {
+        if (!el.value) {
+            return;
+        }
+        const sync = (width: number, height: number) => {
+            editorSize.value = { w: width, h: height };
+        };
+        editorResizeObserver = new ResizeObserver((entries) => {
+            const cr = entries[0]?.contentRect;
+            if (cr) {
+                sync(cr.width, cr.height);
+            }
+        });
+        editorResizeObserver.observe(el.value);
+        sync(el.value.clientWidth, el.value.clientHeight);
+    });
+});
+
+onBeforeUnmount(() => {
+    editorResizeObserver?.disconnect();
+    editorResizeObserver = null;
+});
+
+const defaultNodeWidth = computed(() => props.viewModel.settings.nodes.defaultWidth);
+
+const inflatedViewport = computed(() => {
+    const { w, h } = editorSize.value;
+    if (w <= 0 || h <= 0) {
+        return null;
+    }
+    const g = graph.value;
+    return graphViewportInflated(w, h, g.panning.x, g.panning.y, g.scaling, VIEWPORT_MARGIN_PX);
+});
+
+const visibleNodeIds = computed(() => {
+    const ids = new Set<string>();
+    const vp = inflatedViewport.value;
+    const defaultW = defaultNodeWidth.value;
+    if (!vp) {
+        for (const n of nodes.value) {
+            ids.add(n.id);
+        }
+        return ids;
+    }
+    for (let idx = 0; idx < nodes.value.length; idx++) {
+        const n = nodes.value[idx];
+        if (selectedNodeSet.value.has(n)) {
+            ids.add(n.id);
+            continue;
+        }
+        if (dragMoves.value[idx]?.dragging.value) {
+            ids.add(n.id);
+            continue;
+        }
+        const box = nodeAxisAlignedBox(n, defaultW);
+        if (aabbIntersectsRect(box, vp)) {
+            ids.add(n.id);
+        }
+    }
+    return ids;
+});
 
 const nodeMap = computed(() => {
     const m = new Map<string, AbstractNode>();
@@ -137,7 +209,34 @@ const nodeMap = computed(() => {
     return m;
 });
 
-const visibleConnections = computed(() => connections.value);
+const visibleConnections = computed(() => {
+    const defaultW = defaultNodeWidth.value;
+    const filterCollapsed = (c: Connection) => {
+        const fromN = nodeMap.value.get(c.from.nodeId);
+        const toN = nodeMap.value.get(c.to.nodeId);
+        if (!fromN || !toN) {
+            return false;
+        }
+        return !isNodeCollapsed(fromN) && !isNodeCollapsed(toN);
+    };
+    const vp = inflatedViewport.value;
+    if (!vp) {
+        return connections.value.filter(filterCollapsed);
+    }
+    return connections.value.filter((c) => {
+        if (!filterCollapsed(c)) {
+            return false;
+        }
+        const fromN = nodeMap.value.get(c.from.nodeId);
+        const toN = nodeMap.value.get(c.to.nodeId);
+        if (!fromN || !toN) {
+            return false;
+        }
+        const b1 = nodeAxisAlignedBox(fromN, defaultW);
+        const b2 = nodeAxisAlignedBox(toN, defaultW);
+        return aabbIntersectsRect(b1, vp) || aabbIntersectsRect(b2, vp);
+    });
+});
 
 const panZoom = usePanZoom();
 const temporaryConnection = provideTemporaryConnection();

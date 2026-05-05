@@ -75,12 +75,14 @@ export function useBaklava(existingEditor?: Editor): IBaklavaViewModel {
                 newValue.nodeHooks.beforeLoad.subscribe(token, (state, node) => {
                     node.position = (state as IViewNodeState).position ?? { x: 0, y: 0 };
                     node.width = (state as IViewNodeState).width ?? settings.nodes.defaultWidth;
+                    node.height = (state as IViewNodeState).height;
                     node.twoColumn = (state as IViewNodeState).twoColumn ?? false;
                     return state;
                 });
                 newValue.nodeHooks.afterSave.subscribe(token, (state, node) => {
                     (state as IViewNodeState).position = node.position;
                     (state as IViewNodeState).width = node.width;
+                    (state as IViewNodeState).height = node.height;
                     (state as IViewNodeState).twoColumn = node.twoColumn;
                     return state;
                 });

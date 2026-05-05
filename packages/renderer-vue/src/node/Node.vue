@@ -6,6 +6,7 @@
         :class="classes"
         :style="styles"
         :data-node-type="node.type"
+        :data-pinned-height="pinnedHeightAttr"
         @pointerdown="select"
     >
         <div v-if="viewModel.settings.nodes.resizable" class="__resize-handle" @mousedown="startResize" />
@@ -48,7 +49,7 @@
             </div>
         </slot>
 
-        <slot v-if="isVisible" name="content">
+        <slot v-if="showContent" name="content">
             <div class="__content" :class="classesContent" @keydown.delete.stop>
                 <!-- Outputs -->
                 <div class="__outputs">
@@ -120,22 +121,21 @@ const contextMenuItems = computed(() => {
     return items;
 });
 
-const classes = computed(() => ({
-    "--selected": props.selected,
-    "--dragging": props.dragging,
-    "--two-column": !!props.node.twoColumn,
-    "--collapsed": false,
-    "--offscreen": !props.visible,
-}));
-
-const isVisible = computed(() => props.visible);
-
 const isCollapsed = computed({
     get: () => !!props.node.collapsed,
     set: (v: boolean) => {
         props.node.collapsed = v;
     },
 });
+
+const showContent = computed(() => props.visible && !isCollapsed.value);
+
+const classes = computed(() => ({
+    "--selected": props.selected,
+    "--dragging": props.dragging,
+    "--two-column": !!props.node.twoColumn,
+    "--collapsed": isCollapsed.value,
+}));
 
 const toggleCollapse = () => {
     isCollapsed.value = !isCollapsed.value;
@@ -145,11 +145,29 @@ const classesContent = computed(() => ({
     "--reverse-y": props.node.reverseY ?? viewModel.value.settings.nodes.reverseY,
 }));
 
-const styles = computed(() => ({
-    "top": `${props.node.position?.y ?? 0}px`,
-    "left": `${props.node.position?.x ?? 0}px`,
-    "--width": `${props.node.width ?? viewModel.value.settings.nodes.defaultWidth}px`,
-}));
+/** 画布持久化 height：固定外框高度，内容由主题/宿主对 `.__content` 设 overflow 滚动（FlowUI App.vue） */
+const pinnedHeightAttr = computed(() => {
+    const h = props.node.height;
+    return typeof h === "number" && Number.isFinite(h) && h > 0 ? "1" : undefined;
+});
+
+const styles = computed(() => {
+    const base: Record<string, string> = {
+        top: `${props.node.position?.y ?? 0}px`,
+        left: `${props.node.position?.x ?? 0}px`,
+        "--width": `${props.node.width ?? viewModel.value.settings.nodes.defaultWidth}px`,
+    };
+    const h = props.node.height;
+    if (typeof h === "number" && Number.isFinite(h) && h > 0) {
+        base["height"] = `${h}px`;
+        base["max-height"] = `${h}px`;
+        base["display"] = "flex";
+        base["flex-direction"] = "column";
+        base["overflow"] = "hidden";
+        base["box-sizing"] = "border-box";
+    }
+    return base;
+});
 
 const displayedInputs = computed(() => Object.values(props.node.inputs).filter((ni) => !ni.hidden));
 const displayedOutputs = computed(() => Object.values(props.node.outputs).filter((ni) => !ni.hidden));

@@ -10,6 +10,8 @@ export function useDragMove(positionRef: Ref<IPosition>) {
     const { graph } = useGraph();
     const draggingStartPoint = ref<IPosition | null>(null);
     const draggingStartPosition = ref<IPosition | null>(null);
+    let captureElement: Element | null = null;
+    let capturePointerId: number | null = null;
 
     const dragging = computed(() => !!draggingStartPoint.value);
 
@@ -22,6 +24,17 @@ export function useDragMove(positionRef: Ref<IPosition>) {
             x: positionRef.value.x,
             y: positionRef.value.y,
         };
+        const t = ev.target;
+        if (t instanceof Element && typeof t.setPointerCapture === "function") {
+            try {
+                t.setPointerCapture(ev.pointerId);
+                captureElement = t;
+                capturePointerId = ev.pointerId;
+            } catch {
+                captureElement = null;
+                capturePointerId = null;
+            }
+        }
     };
 
     const onPointerMove = (ev: PointerEvent) => {
@@ -33,7 +46,19 @@ export function useDragMove(positionRef: Ref<IPosition>) {
         }
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (ev?: PointerEvent) => {
+        if (captureElement && typeof captureElement.releasePointerCapture === "function") {
+            const pid = ev?.pointerId ?? capturePointerId;
+            if (pid != null) {
+                try {
+                    captureElement.releasePointerCapture(pid);
+                } catch {
+                    /* ignore */
+                }
+            }
+        }
+        captureElement = null;
+        capturePointerId = null;
         draggingStartPoint.value = null;
         draggingStartPosition.value = null;
     };

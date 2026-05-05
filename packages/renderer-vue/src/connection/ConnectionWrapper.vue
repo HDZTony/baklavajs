@@ -7,6 +7,8 @@ import { computed, defineComponent, ref, onBeforeUnmount, onMounted, nextTick, w
 import { Connection } from "@baklavajs/core";
 import ConnectionView from "./ConnectionView.vue";
 import { getDomElements, IResolvedDomElements } from "./domResolver";
+import { scheduleConnectionLayoutRead } from "./connectionLayoutBatcher";
+import type { NodeInterface } from "@baklavajs/core";
 import { TemporaryConnectionState } from "./connection";
 import { useGraph } from "../utility";
 
@@ -23,7 +25,7 @@ export default defineComponent({
     setup(props) {
         const { graph } = useGraph();
 
-        let resizeObserver: ResizeObserver;
+        let resizeObserver: ResizeObserver | undefined;
         const d = ref({ x1: 0, y1: 0, x2: 0, y2: 0 });
 
         const state = computed(() =>
@@ -33,7 +35,21 @@ export default defineComponent({
         const fromNodePosition = computed(() => graph.value.findNodeById(props.connection.from.nodeId)?.position);
         const toNodePosition = computed(() => graph.value.findNodeById(props.connection.to.nodeId)?.position);
 
-        const getPortCoordinates = (resolved: IResolvedDomElements): [number, number] => {
+        const portFallbackOnNode = (ni: NodeInterface, resolved: IResolvedDomElements): [number, number] | null => {
+            if (resolved.node) {
+                return [
+                    resolved.node.offsetLeft + resolved.node.offsetWidth * 0.5,
+                    resolved.node.offsetTop + resolved.node.offsetHeight * 0.5,
+                ];
+            }
+            const el = document.getElementById(ni.nodeId);
+            if (el) {
+                return [el.offsetLeft + el.offsetWidth * 0.5, el.offsetTop + el.offsetHeight * 0.5];
+            }
+            return null;
+        };
+
+        const getPortCoordinates = (ni: NodeInterface, resolved: IResolvedDomElements): [number, number] => {
             if (resolved.node && resolved.interface && resolved.port) {
                 return [
                     resolved.node.offsetLeft +
@@ -45,9 +61,8 @@ export default defineComponent({
                         resolved.port.offsetTop +
                         resolved.port.clientHeight / 2,
                 ];
-            } else {
-                return [0, 0];
             }
+            return portFallbackOnNode(ni, resolved) ?? [0, 0];
         };
 
         const updateCoords = () => {
@@ -62,16 +77,18 @@ export default defineComponent({
                     resizeObserver.observe(to.node);
                 }
             }
-            const [x1, y1] = getPortCoordinates(from);
-            const [x2, y2] = getPortCoordinates(to);
+            const [x1, y1] = getPortCoordinates(props.connection.from, from);
+            const [x2, y2] = getPortCoordinates(props.connection.to, to);
             d.value = { x1, y1, x2, y2 };
         };
 
-        let rafId: number | null = null;
+        let alive = true;
+
         const scheduleUpdate = () => {
-            if (rafId !== null) return;
-            rafId = requestAnimationFrame(() => {
-                rafId = null;
+            scheduleConnectionLayoutRead(() => {
+                if (!alive) {
+                    return;
+                }
                 updateCoords();
             });
         };
@@ -82,10 +99,7 @@ export default defineComponent({
         });
 
         onBeforeUnmount(() => {
-            if (rafId !== null) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-            }
+            alive = false;
             if (resizeObserver) {
                 resizeObserver.disconnect();
             }
