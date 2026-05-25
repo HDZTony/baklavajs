@@ -1,0 +1,62 @@
+.baklava-context-menu {
+    color: var(--baklava-control-color-foreground);
+    position: absolute;
+    display: inline-block;
+    z-index: 100;
+    background-color: var(--baklava-context-menu-background);
+    box-shadow: var(--baklava-context-menu-shadow);
+    border-radius: 0 0 var(--baklava-control-border-radius) var(--baklava-control-border-radius);
+    min-width: 6rem;
+    width: max-content;
+
+    & > .item {
+        display: flex;
+        align-items: center;
+        padding: 0.35em 1em;
+        transition: background 0.05s linear;
+        position: relative;
+
+        & > .__label {
+            flex: 1 1 auto;
+        }
+
+        & > .__submenu-icon {
+            margin-left: 0.75rem;
+        }
+
+        &.--disabled {
+            color: var(--baklava-control-color-hover);
+        }
+
+        &:not(.--header):not(.--active):not(.--disabled) {
+            &:hover {
+                background: var(--baklava-control-color-primary);
+            }
+        }
+
+        &.--active {
+            background: var(--baklava-control-color-primary);
+        }
+    }
+
+    &.--nested {
+        left: 100%;
+        top: 0;
+    }
+
+    &.--flipped-x.--nested {
+        left: unset;
+        right: 100%;
+    }
+
+    &.--flipped-y.--nested {
+        top: unset;
+        bottom: 0;
+    }
+
+    & > .divider {
+        margin: 0.35em 0;
+        height: 1px;
+        background-color: var(--baklava-control-color-hover);
+    }
+}

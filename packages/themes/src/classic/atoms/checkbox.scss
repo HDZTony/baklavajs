@@ -1,0 +1,45 @@
+.baklava-checkbox {
+    display: flex;
+    padding: 0.35em 0;
+    cursor: pointer;
+    overflow-x: hidden;
+    align-items: center;
+
+    .__checkmark-container {
+        display: flex;
+        background-color: var(--baklava-control-color-background);
+        border-radius: var(--baklava-control-border-radius);
+        transition: background-color var(--baklava-visual-transition);
+        width: 18px;
+        height: 18px;
+    }
+    &:hover .__checkmark-container {
+        background-color: var(--baklava-control-color-hover);
+    }
+    &:active .__checkmark-container {
+        background-color: var(--baklava-control-color-active);
+    }
+
+    .__checkmark {
+        stroke-dasharray: 15;
+        stroke-dashoffset: 15;
+        stroke: var(--baklava-control-color-foreground);
+        stroke-width: 2px;
+        fill: none;
+        transition: stroke-dashoffset var(--baklava-visual-transition);
+    }
+
+    &.--checked {
+        & .__checkmark {
+            stroke-dashoffset: 0;
+        }
+
+        & .__checkmark-container {
+            background-color: var(--baklava-control-color-primary);
+        }
+    }
+
+    .__label {
+        margin-left: 0.5rem;
+    }
+}
