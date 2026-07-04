@@ -1,12 +1,14 @@
-import { inject, provide, ref, Ref } from "vue";
+import { inject, onScopeDispose, provide, ref, Ref, watch } from "vue";
 import { NodeInterface } from "@baklavajs/core";
 import { ITemporaryConnection, TemporaryConnectionState } from "../connection/connection";
 import { useGraph } from "../utility";
+import { resolveTemporaryMouseDownAction, resolveTemporaryMouseUpAction } from "./temporaryConnectionState";
 
 const TEMPORARY_CONNECTION_HANDLER_INJECTION_SYMBOL = Symbol();
 export interface ITemporaryConnectionHandler {
     hoveredOver: (ni: NodeInterface | undefined) => void;
     temporaryConnection: Ref<ITemporaryConnection | null>;
+    cancelTemporaryConnection: () => void;
 }
 
 export function provideTemporaryConnection() {
@@ -14,6 +16,39 @@ export function provideTemporaryConnection() {
 
     const temporaryConnection = ref<ITemporaryConnection | null>(null) as Ref<ITemporaryConnection | null>;
     const hoveringOver = ref<NodeInterface | null>(null) as Ref<NodeInterface | null>;
+    const awaitingClickTarget = ref(false);
+
+    const clearConnectionDangerFlags = () => {
+        graph.value.connections.forEach((c) => {
+            c.isInDanger = false;
+        });
+    };
+
+    const cancelTemporaryConnection = () => {
+        temporaryConnection.value = null;
+        awaitingClickTarget.value = false;
+        clearConnectionDangerFlags();
+    };
+
+    const beginTemporaryConnection = (from: NodeInterface) => {
+        const connection = graph.value.connections.find((c) => c.to === from);
+        if (from.isInput && connection) {
+            temporaryConnection.value = {
+                status: TemporaryConnectionState.NONE,
+                from: connection.from,
+            };
+            graph.value.removeConnection(connection);
+        } else {
+            temporaryConnection.value = {
+                status: TemporaryConnectionState.NONE,
+                from,
+            };
+        }
+
+        temporaryConnection.value.mx = undefined;
+        temporaryConnection.value.my = undefined;
+        awaitingClickTarget.value = false;
+    };
 
     const onMouseMove = (ev: MouseEvent) => {
         if (temporaryConnection.value) {
@@ -23,44 +58,56 @@ export function provideTemporaryConnection() {
     };
 
     const onMouseDown = () => {
-        if (hoveringOver.value) {
-            if (temporaryConnection.value) {
-                // onMouseUp();
-                // for creating connections with clicking instead of dragging
-                return;
-            }
+        const action = resolveTemporaryMouseDownAction(
+            hoveringOver.value,
+            !!temporaryConnection.value,
+            temporaryConnection.value?.from ?? null,
+            awaitingClickTarget.value,
+        );
 
-            // if this interface is an input and already has a connection
-            // to it, remove the connection and make it temporary
-            const connection = graph.value.connections.find((c) => c.to === hoveringOver.value);
-            if (hoveringOver.value.isInput && connection) {
-                temporaryConnection.value = {
-                    status: TemporaryConnectionState.NONE,
-                    from: connection.from,
-                };
-                graph.value.removeConnection(connection);
-            } else {
-                temporaryConnection.value = {
-                    status: TemporaryConnectionState.NONE,
-                    from: hoveringOver.value,
-                };
+        if (action === "ignore") {
+            return;
+        }
+        if (action === "cancel") {
+            cancelTemporaryConnection();
+            return;
+        }
+        if (action === "cancel_and_create" || action === "create") {
+            if (action === "cancel_and_create") {
+                cancelTemporaryConnection();
             }
-
-            temporaryConnection.value.mx = undefined;
-            temporaryConnection.value.my = undefined;
+            if (hoveringOver.value) {
+                beginTemporaryConnection(hoveringOver.value);
+            }
         }
     };
 
     const onMouseUp = () => {
-        if (temporaryConnection.value && hoveringOver.value) {
-            if (temporaryConnection.value.from === hoveringOver.value) {
-                // for creating connections with clicking instead of dragging
-                return;
-            }
-
-            graph.value.addConnection(temporaryConnection.value.from, temporaryConnection.value.to!);
+        if (!temporaryConnection.value) {
+            return;
         }
-        temporaryConnection.value = null;
+
+        const upAction = resolveTemporaryMouseUpAction(
+            hoveringOver.value,
+            temporaryConnection.value.from,
+            awaitingClickTarget.value,
+        );
+
+        if (upAction.type === "none") {
+            return;
+        }
+        if (upAction.type === "await_target") {
+            awaitingClickTarget.value = true;
+            return;
+        }
+        if (upAction.type === "connect" && hoveringOver.value) {
+            graph.value.addConnection(temporaryConnection.value.from, hoveringOver.value);
+        }
+        cancelTemporaryConnection();
+    };
+
+    const onPointerCancel = () => {
+        cancelTemporaryConnection();
     };
 
     const hoveredOver = (ni: NodeInterface | undefined) => {
@@ -86,18 +133,62 @@ export function provideTemporaryConnection() {
         } else if (!ni && temporaryConnection.value) {
             temporaryConnection.value.to = undefined;
             temporaryConnection.value.status = TemporaryConnectionState.NONE;
-            graph.value.connections.forEach((c) => {
-                c.isInDanger = false;
-            });
+            clearConnectionDangerFlags();
         }
     };
+
+    const onDocumentPointerUp = (ev: PointerEvent) => {
+        if (!temporaryConnection.value) {
+            return;
+        }
+        const endedInsideEditor = ev.composedPath().some(
+            (el) => el instanceof Element && el.classList.contains("baklava-editor"),
+        );
+        if (endedInsideEditor) {
+            return;
+        }
+        cancelTemporaryConnection();
+    };
+
+    const onWindowBlur = () => {
+        cancelTemporaryConnection();
+    };
+
+    watch(
+        temporaryConnection,
+        (tc, _prev, onCleanup) => {
+            if (!tc) {
+                return;
+            }
+            document.addEventListener("pointerup", onDocumentPointerUp, true);
+            window.addEventListener("blur", onWindowBlur);
+            onCleanup(() => {
+                document.removeEventListener("pointerup", onDocumentPointerUp, true);
+                window.removeEventListener("blur", onWindowBlur);
+            });
+        },
+        { flush: "sync" },
+    );
+
+    onScopeDispose(() => {
+        cancelTemporaryConnection();
+    });
 
     provide<ITemporaryConnectionHandler>(TEMPORARY_CONNECTION_HANDLER_INJECTION_SYMBOL, {
         temporaryConnection,
         hoveredOver,
+        cancelTemporaryConnection,
     });
 
-    return { temporaryConnection, onMouseMove, onMouseDown, onMouseUp, hoveredOver };
+    return {
+        temporaryConnection,
+        onMouseMove,
+        onMouseDown,
+        onMouseUp,
+        onPointerCancel,
+        hoveredOver,
+        cancelTemporaryConnection,
+    };
 }
 
 export function useTemporaryConnection() {

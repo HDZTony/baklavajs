@@ -11,6 +11,7 @@
         @pointermove.self="onPointerMove"
         @pointerdown="onPointerDown"
         @pointerup="onPointerUp"
+        @pointercancel="onPointerCancel"
         @wheel.self="panZoom.onMouseWheel"
         @keydown="keyDown"
         @keyup="keyUp"
@@ -278,9 +279,18 @@ const onPointerUp = (ev: PointerEvent) => {
     temporaryConnection.onMouseUp();
 };
 
+const onPointerCancel = () => {
+    temporaryConnection.onPointerCancel();
+};
+
 const keyDown = (ev: KeyboardEvent) => {
     if (ev.key === "Tab") {
         ev.preventDefault();
+    }
+    if (ev.key === "Escape" && temporaryConnection.temporaryConnection.value) {
+        temporaryConnection.cancelTemporaryConnection();
+        ev.preventDefault();
+        return;
     }
     props.viewModel.commandHandler.handleKeyDown(ev);
 };
