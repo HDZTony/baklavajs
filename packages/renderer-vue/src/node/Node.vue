@@ -81,6 +81,7 @@ import { useGraph, useViewModel } from "../utility";
 import { ContextMenu } from "../contextmenu";
 import VerticalDots from "../icons/VerticalDots.vue";
 import NodeInterface from "./NodeInterface.vue";
+import { requestConnectionLayoutRefreshForNode } from "../connection/connectionLayoutBatcher";
 const props = withDefaults(
     defineProps<{
         node: AbstractNode;
@@ -213,6 +214,7 @@ const doneRenaming = () => {
 const onRender = () => {
     if (el.value) {
         viewModel.value.hooks.renderNode.execute({ node: props.node, el: el.value });
+        requestConnectionLayoutRefreshForNode(props.node.id);
     }
 };
 

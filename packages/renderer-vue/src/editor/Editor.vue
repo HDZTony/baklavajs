@@ -118,6 +118,7 @@ import Minimap from "../components/Minimap.vue";
 import NodePalette from "../nodepalette/NodePalette.vue";
 import Toolbar from "../toolbar/Toolbar.vue";
 import ContextMenu from "../contextmenu/ContextMenu.vue";
+import { forceConnectionLayoutRefresh } from "../connection/connectionLayoutBatcher";
 
 const props = defineProps<{ viewModel: IBaklavaViewModel }>();
 
@@ -138,8 +139,16 @@ const selectedNodeSet = computed(() => new Set(props.viewModel.displayedGraph.se
 const { graph } = useGraph();
 const editorSize = ref({ w: 0, h: 0 });
 let editorResizeObserver: ResizeObserver | null = null;
+const refreshConnectionsAfterFocus = () => forceConnectionLayoutRefresh();
+const refreshConnectionsAfterVisibility = () => {
+    if (document.visibilityState === "visible") {
+        forceConnectionLayoutRefresh();
+    }
+};
 
 onMounted(() => {
+    window.addEventListener("focus", refreshConnectionsAfterFocus);
+    document.addEventListener("visibilitychange", refreshConnectionsAfterVisibility);
     void nextTick(() => {
         if (!el.value) {
             return;
@@ -159,6 +168,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    window.removeEventListener("focus", refreshConnectionsAfterFocus);
+    document.removeEventListener("visibilitychange", refreshConnectionsAfterVisibility);
     editorResizeObserver?.disconnect();
     editorResizeObserver = null;
 });

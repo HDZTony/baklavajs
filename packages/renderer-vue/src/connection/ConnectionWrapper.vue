@@ -7,7 +7,10 @@ import { computed, defineComponent, ref, onBeforeUnmount, onMounted, nextTick, w
 import { Connection } from "@baklavajs/core";
 import ConnectionView from "./ConnectionView.vue";
 import { getDomElements, IResolvedDomElements } from "./domResolver";
-import { scheduleConnectionLayoutRead } from "./connectionLayoutBatcher";
+import {
+    scheduleConnectionLayoutRead,
+    subscribeConnectionLayoutRefresh,
+} from "./connectionLayoutBatcher";
 import type { NodeInterface } from "@baklavajs/core";
 import { TemporaryConnectionState } from "./connection";
 import { useGraph } from "../utility";
@@ -26,6 +29,7 @@ export default defineComponent({
         const { graph } = useGraph();
 
         let resizeObserver: ResizeObserver | undefined;
+        let unsubscribeLayoutRefresh: (() => void) | undefined;
         const d = ref({ x1: 0, y1: 0, x2: 0, y2: 0 });
 
         const state = computed(() =>
@@ -96,12 +100,17 @@ export default defineComponent({
         };
 
         onMounted(async () => {
+            unsubscribeLayoutRefresh = subscribeConnectionLayoutRefresh(
+                [props.connection.from.nodeId, props.connection.to.nodeId],
+                updateCoords,
+            );
             await nextTick();
             updateCoords();
         });
 
         onBeforeUnmount(() => {
             alive = false;
+            unsubscribeLayoutRefresh?.();
             if (resizeObserver) {
                 resizeObserver.disconnect();
             }
