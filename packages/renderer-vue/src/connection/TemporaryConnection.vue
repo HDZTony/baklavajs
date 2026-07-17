@@ -10,7 +10,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from "vue";
+import { computed, defineComponent, inject, Ref } from "vue";
 
 import ConnectionView from "./ConnectionView.vue";
 import { ITemporaryConnection, TemporaryConnectionState } from "./connection";
@@ -28,6 +28,11 @@ export default defineComponent({
         }
     },
     setup(props) {
+        const editorEl = inject<Ref<HTMLElement | null>>("editorEl");
+        if (!editorEl) {
+            throw new Error("TemporaryConnection must be used within a BaklavaEditor");
+        }
+
         const status = computed(() => (props.connection ? props.connection.status : TemporaryConnectionState.NONE));
 
         const d = computed(() => {
@@ -38,10 +43,14 @@ export default defineComponent({
                 };
             }
 
-            const start = getPortCoordinates(getDomElements(props.connection.from));
+            const root = editorEl.value;
+            if (!root) {
+                throw new Error("BaklavaEditor element is not mounted");
+            }
+            const start = getPortCoordinates(getDomElements(props.connection.from, root));
             const end = props.connection.to
-                ? getPortCoordinates(getDomElements(props.connection.to))
-                : [props.connection.mx || start[0], props.connection.my || start[1]];
+                ? getPortCoordinates(getDomElements(props.connection.to, root))
+                : [props.connection.mx ?? start[0], props.connection.my ?? start[1]];
 
             if (props.connection.from.isInput) {
                 return {

@@ -3,10 +3,10 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onBeforeUnmount, onMounted, nextTick, watch } from "vue";
+import { computed, defineComponent, inject, ref, onBeforeUnmount, onMounted, nextTick, watch, Ref } from "vue";
 import { Connection } from "@baklavajs/core";
 import ConnectionView from "./ConnectionView.vue";
-import { getDomElements, IResolvedDomElements } from "./domResolver";
+import { getDomElementById, getDomElements, IResolvedDomElements } from "./domResolver";
 import {
     scheduleConnectionLayoutRead,
     subscribeConnectionLayoutRefresh,
@@ -27,6 +27,10 @@ export default defineComponent({
     },
     setup(props) {
         const { graph } = useGraph();
+        const editorEl = inject<Ref<HTMLElement | null>>("editorEl");
+        if (!editorEl) {
+            throw new Error("ConnectionWrapper must be used within a BaklavaEditor");
+        }
 
         let resizeObserver: ResizeObserver | undefined;
         let unsubscribeLayoutRefresh: (() => void) | undefined;
@@ -46,7 +50,7 @@ export default defineComponent({
                     resolved.node.offsetTop + resolved.node.offsetHeight * 0.5,
                 ];
             }
-            const el = document.getElementById(ni.nodeId);
+            const el = editorEl.value ? getDomElementById(ni.nodeId, editorEl.value) : null;
             if (el) {
                 return [el.offsetLeft + el.offsetWidth * 0.5, el.offsetTop + el.offsetHeight * 0.5];
             }
@@ -72,8 +76,12 @@ export default defineComponent({
         };
 
         const updateCoords = () => {
-            const from = getDomElements(props.connection.from);
-            const to = getDomElements(props.connection.to);
+            const root = editorEl.value;
+            if (!root) {
+                return;
+            }
+            const from = getDomElements(props.connection.from, root);
+            const to = getDomElements(props.connection.to, root);
             if (from.node && to.node) {
                 if (!resizeObserver) {
                     resizeObserver = new ResizeObserver(() => {

@@ -6,12 +6,19 @@ export interface IResolvedDomElements {
     port: HTMLElement | null;
 }
 
-export function getDomElementOfNode(node: AbstractNode): HTMLElement | null {
-    return document.getElementById(node.id);
+export function getDomElementById(id: string, root: ParentNode = document): HTMLElement | null {
+    if (root === document) {
+        return document.getElementById(id);
+    }
+    return root.querySelector<HTMLElement>(`#${CSS.escape(id)}`);
 }
 
-export function getDomElements(ni: NodeInterface): IResolvedDomElements {
-    const interfaceDOM = document.getElementById(ni.id);
+export function getDomElementOfNode(node: AbstractNode, root: ParentNode = document): HTMLElement | null {
+    return getDomElementById(node.id, root);
+}
+
+export function getDomElements(ni: NodeInterface, root: ParentNode = document): IResolvedDomElements {
+    const interfaceDOM = getDomElementById(ni.id, root);
     const portDOM = interfaceDOM?.getElementsByClassName("__port");
 
     return {

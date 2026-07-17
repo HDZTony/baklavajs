@@ -1,5 +1,34 @@
 import type { NodeInterface } from "@baklavajs/core";
 
+export interface EditorBounds {
+    left: number;
+    top: number;
+}
+
+export interface GraphViewportTransform {
+    scaling: number;
+    panning: { x: number; y: number };
+}
+
+export function clientPointToGraphPoint(
+    clientX: number,
+    clientY: number,
+    editorBounds: EditorBounds,
+    transform: GraphViewportTransform,
+): [number, number] {
+    if (transform.scaling <= 0) {
+        throw new Error("Graph scaling must be greater than zero");
+    }
+    return [
+        (clientX - editorBounds.left) / transform.scaling - transform.panning.x,
+        (clientY - editorBounds.top) / transform.scaling - transform.panning.y,
+    ];
+}
+
+export function eventPathIncludesEditor(path: EventTarget[], editorEl: HTMLElement): boolean {
+    return path.includes(editorEl);
+}
+
 export type TemporaryMouseDownAction = "create" | "cancel" | "cancel_and_create" | "ignore";
 
 export type TemporaryMouseUpAction =

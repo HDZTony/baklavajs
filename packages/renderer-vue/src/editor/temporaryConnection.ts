@@ -2,7 +2,12 @@ import { inject, onScopeDispose, provide, ref, Ref, watch } from "vue";
 import { NodeInterface } from "@baklavajs/core";
 import { ITemporaryConnection, TemporaryConnectionState } from "../connection/connection";
 import { useGraph } from "../utility";
-import { resolveTemporaryMouseDownAction, resolveTemporaryMouseUpAction } from "./temporaryConnectionState";
+import {
+    clientPointToGraphPoint,
+    eventPathIncludesEditor,
+    resolveTemporaryMouseDownAction,
+    resolveTemporaryMouseUpAction,
+} from "./temporaryConnectionState";
 
 const TEMPORARY_CONNECTION_HANDLER_INJECTION_SYMBOL = Symbol();
 export interface ITemporaryConnectionHandler {
@@ -13,6 +18,10 @@ export interface ITemporaryConnectionHandler {
 
 export function provideTemporaryConnection() {
     const { graph } = useGraph();
+    const editorEl = inject<Ref<HTMLElement | null>>("editorEl");
+    if (!editorEl) {
+        throw new Error("provideTemporaryConnection must be used within a BaklavaEditor");
+    }
 
     const temporaryConnection = ref<ITemporaryConnection | null>(null) as Ref<ITemporaryConnection | null>;
     const hoveringOver = ref<NodeInterface | null>(null) as Ref<NodeInterface | null>;
@@ -50,10 +59,16 @@ export function provideTemporaryConnection() {
         awaitingClickTarget.value = false;
     };
 
-    const onMouseMove = (ev: MouseEvent) => {
+    const onPointerMove = (ev: PointerEvent) => {
         if (temporaryConnection.value) {
-            temporaryConnection.value.mx = ev.offsetX / graph.value.scaling - graph.value.panning.x;
-            temporaryConnection.value.my = ev.offsetY / graph.value.scaling - graph.value.panning.y;
+            const root = editorEl.value;
+            if (!root) {
+                cancelTemporaryConnection();
+                return;
+            }
+            const [x, y] = clientPointToGraphPoint(ev.clientX, ev.clientY, root.getBoundingClientRect(), graph.value);
+            temporaryConnection.value.mx = x;
+            temporaryConnection.value.my = y;
         }
     };
 
@@ -106,10 +121,6 @@ export function provideTemporaryConnection() {
         cancelTemporaryConnection();
     };
 
-    const onPointerCancel = () => {
-        cancelTemporaryConnection();
-    };
-
     const hoveredOver = (ni: NodeInterface | undefined) => {
         hoveringOver.value = ni ?? null;
         if (ni && temporaryConnection.value) {
@@ -141,13 +152,31 @@ export function provideTemporaryConnection() {
         if (!temporaryConnection.value) {
             return;
         }
-        const endedInsideEditor = ev.composedPath().some(
-            (el) => el instanceof Element && el.classList.contains("baklava-editor"),
-        );
-        if (endedInsideEditor) {
+        const root = editorEl.value;
+        if (root && eventPathIncludesEditor(ev.composedPath(), root)) {
+            onMouseUp();
             return;
         }
         cancelTemporaryConnection();
+    };
+
+    const onDocumentPointerCancel = () => {
+        cancelTemporaryConnection();
+    };
+
+    const onDocumentKeyDown = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape" || !temporaryConnection.value) {
+            return;
+        }
+        cancelTemporaryConnection();
+        ev.preventDefault();
+        ev.stopPropagation();
+    };
+
+    const onVisibilityChange = () => {
+        if (document.visibilityState === "hidden") {
+            cancelTemporaryConnection();
+        }
     };
 
     const onWindowBlur = () => {
@@ -160,10 +189,18 @@ export function provideTemporaryConnection() {
             if (!tc) {
                 return;
             }
+            document.addEventListener("pointermove", onPointerMove, true);
             document.addEventListener("pointerup", onDocumentPointerUp, true);
+            document.addEventListener("pointercancel", onDocumentPointerCancel, true);
+            document.addEventListener("keydown", onDocumentKeyDown, true);
+            document.addEventListener("visibilitychange", onVisibilityChange);
             window.addEventListener("blur", onWindowBlur);
             onCleanup(() => {
+                document.removeEventListener("pointermove", onPointerMove, true);
                 document.removeEventListener("pointerup", onDocumentPointerUp, true);
+                document.removeEventListener("pointercancel", onDocumentPointerCancel, true);
+                document.removeEventListener("keydown", onDocumentKeyDown, true);
+                document.removeEventListener("visibilitychange", onVisibilityChange);
                 window.removeEventListener("blur", onWindowBlur);
             });
         },
@@ -182,10 +219,8 @@ export function provideTemporaryConnection() {
 
     return {
         temporaryConnection,
-        onMouseMove,
         onMouseDown,
         onMouseUp,
-        onPointerCancel,
         hoveredOver,
         cancelTemporaryConnection,
     };

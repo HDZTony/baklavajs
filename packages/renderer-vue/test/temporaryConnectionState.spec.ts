@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { NodeInterface } from "@baklavajs/core";
 import {
+    clientPointToGraphPoint,
+    eventPathIncludesEditor,
     resolveTemporaryMouseDownAction,
     resolveTemporaryMouseUpAction,
 } from "../src/editor/temporaryConnectionState";
+
+describe("temporary connection coordinates", () => {
+    it("converts client coordinates relative to the editor bounds", () => {
+        expect(
+            clientPointToGraphPoint(350, 260, { left: 100, top: 60 }, { scaling: 2, panning: { x: 10, y: 20 } }),
+        ).toEqual([115, 80]);
+    });
+
+    it("rejects an invalid graph scale", () => {
+        expect(() =>
+            clientPointToGraphPoint(0, 0, { left: 0, top: 0 }, { scaling: 0, panning: { x: 0, y: 0 } }),
+        ).toThrow("Graph scaling must be greater than zero");
+    });
+
+    it("matches only the editor that owns the event path", () => {
+        const activeEditor = {} as HTMLElement;
+        const otherEditor = {} as HTMLElement;
+        expect(eventPathIncludesEditor([{}, activeEditor] as EventTarget[], activeEditor)).toBe(true);
+        expect(eventPathIncludesEditor([{}, otherEditor] as EventTarget[], activeEditor)).toBe(false);
+    });
+});
 
 function port(name: string, isInput: boolean) {
     const ni = new NodeInterface(name, 0);

@@ -11,7 +11,6 @@
         @pointermove.self="onPointerMove"
         @pointerdown="onPointerDown"
         @pointerup="onPointerUp"
-        @pointercancel="onPointerCancel"
         @wheel.self="panZoom.onMouseWheel"
         @keydown="keyDown"
         @keyup="keyUp"
@@ -268,7 +267,6 @@ props.viewModel.editor.hooks.load.subscribe(token, (s) => {
 
 const onPointerMove = (ev: PointerEvent) => {
     panZoom.onPointerMove(ev);
-    temporaryConnection.onMouseMove(ev);
 };
 
 const onPointerDown = (ev: PointerEvent) => {
@@ -287,11 +285,6 @@ const onPointerDown = (ev: PointerEvent) => {
 
 const onPointerUp = (ev: PointerEvent) => {
     panZoom.onPointerUp(ev);
-    temporaryConnection.onMouseUp();
-};
-
-const onPointerCancel = () => {
-    temporaryConnection.onPointerCancel();
 };
 
 const keyDown = (ev: KeyboardEvent) => {
