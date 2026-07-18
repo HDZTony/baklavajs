@@ -16,9 +16,9 @@ export interface ITemporaryConnectionHandler {
     cancelTemporaryConnection: () => void;
 }
 
-export function provideTemporaryConnection() {
+export function provideTemporaryConnection(editorElRef?: Ref<HTMLElement | null>) {
     const { graph } = useGraph();
-    const editorEl = inject<Ref<HTMLElement | null>>("editorEl");
+    const editorEl = editorElRef ?? inject<Ref<HTMLElement | null>>("editorEl");
     if (!editorEl) {
         throw new Error("provideTemporaryConnection must be used within a BaklavaEditor");
     }

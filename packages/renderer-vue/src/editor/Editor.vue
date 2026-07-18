@@ -250,7 +250,7 @@ const visibleConnections = computed(() => {
 });
 
 const panZoom = usePanZoom();
-const temporaryConnection = provideTemporaryConnection();
+const temporaryConnection = provideTemporaryConnection(el);
 const contextMenu = useContextMenu(viewModelRef);
 const selectionBox = useSelectionBox(el);
 
