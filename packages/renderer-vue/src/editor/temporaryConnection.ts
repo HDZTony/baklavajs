@@ -16,12 +16,17 @@ export interface ITemporaryConnectionHandler {
     cancelTemporaryConnection: () => void;
 }
 
-export function provideTemporaryConnection(editorElRef?: Ref<HTMLElement | null>) {
+/**
+ * Must receive the editor root element ref from Editor.vue.
+ * Do not inject("editorEl") here — Vue cannot self-inject in the same component
+ * that provide()s it, which previously crashed BaklavaEditor to a blank canvas.
+ */
+export function provideTemporaryConnection(editorElRef: Ref<HTMLElement | null>) {
     const { graph } = useGraph();
-    const editorEl = editorElRef ?? inject<Ref<HTMLElement | null>>("editorEl");
-    if (!editorEl) {
-        throw new Error("provideTemporaryConnection must be used within a BaklavaEditor");
+    if (!editorElRef) {
+        throw new Error("provideTemporaryConnection requires the BaklavaEditor root element ref");
     }
+    const editorEl = editorElRef;
 
     const temporaryConnection = ref<ITemporaryConnection | null>(null) as Ref<ITemporaryConnection | null>;
     const hoveringOver = ref<NodeInterface | null>(null) as Ref<NodeInterface | null>;
