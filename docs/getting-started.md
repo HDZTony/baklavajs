@@ -95,7 +95,7 @@ That's it! You should now be able to create nodes and connect them.
 
 ## Try it out
 
-Right-click the canvas to add nodes, then drag between ports to connect them:
+Right-click the canvas to add nodes, then drag between ports to connect them. Node and canvas dragging start after a short pointer movement; pressing Shift / Ctrl / Alt does not move nodes.
 
 <BaklavaExample height="450px">
     <GettingStartedExample />

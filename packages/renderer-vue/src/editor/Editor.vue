@@ -11,6 +11,7 @@
         @pointermove.self="onPointerMove"
         @pointerdown="onPointerDown"
         @pointerup="onPointerUp"
+        @pointercancel="onPointerUp"
         @wheel.self="panZoom.onMouseWheel"
         @keydown="keyDown"
         @keyup="keyUp"
@@ -322,27 +323,38 @@ const unselectAllNodes = () => {
     props.viewModel.displayedGraph.selectedNodes = [];
 };
 
+/** Drag sessions must not be looked up from `selectedNodes` on pointerup — selection can change (IME Shift, click elsewhere) and leak move listeners. */
+const activeNodeDragMoves: Array<ReturnType<typeof useDragMove>> = [];
+
 const startDrag = (ev: PointerEvent) => {
+    stopDrag(ev);
     for (const selectedNode of props.viewModel.displayedGraph.selectedNodes) {
         const idx = nodes.value.indexOf(selectedNode);
-        const dragMove = dragMoves.value[idx];
+        const dragMove = idx >= 0 ? dragMoves.value[idx] : undefined;
+        if (!dragMove) {
+            continue;
+        }
         dragMove.onPointerDown(ev);
-
         document.addEventListener("pointermove", dragMove.onPointerMove);
+        activeNodeDragMoves.push(dragMove);
     }
 
     document.addEventListener("pointerup", stopDrag);
+    document.addEventListener("pointercancel", stopDrag);
 };
 
-const stopDrag = () => {
-    for (const selectedNode of props.viewModel.displayedGraph.selectedNodes) {
-        const idx = nodes.value.indexOf(selectedNode);
-        const dragMove = dragMoves.value[idx];
-        dragMove.onPointerUp();
-
+const stopDrag = (ev?: Event) => {
+    const pointerEv = ev instanceof PointerEvent ? ev : undefined;
+    for (const dragMove of activeNodeDragMoves) {
+        dragMove.onPointerUp(pointerEv);
         document.removeEventListener("pointermove", dragMove.onPointerMove);
     }
-
+    activeNodeDragMoves.length = 0;
     document.removeEventListener("pointerup", stopDrag);
+    document.removeEventListener("pointercancel", stopDrag);
 };
+
+onBeforeUnmount(() => {
+    stopDrag();
+});
 </script>

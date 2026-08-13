@@ -1,4 +1,5 @@
 import { computed, Ref, ref } from "vue";
+import { decideDragPointerMove } from "./dragPointerMove";
 import { useGraph } from "./useGraph";
 
 interface IPosition {
@@ -12,10 +13,12 @@ export function useDragMove(positionRef: Ref<IPosition>) {
     const draggingStartPosition = ref<IPosition | null>(null);
     let captureElement: Element | null = null;
     let capturePointerId: number | null = null;
+    let passedThreshold = false;
 
     const dragging = computed(() => !!draggingStartPoint.value);
 
     const onPointerDown = (ev: PointerEvent) => {
+        passedThreshold = false;
         draggingStartPoint.value = {
             x: ev.pageX,
             y: ev.pageY,
@@ -37,15 +40,6 @@ export function useDragMove(positionRef: Ref<IPosition>) {
         }
     };
 
-    const onPointerMove = (ev: PointerEvent) => {
-        if (draggingStartPoint.value) {
-            const dx = ev.pageX - draggingStartPoint.value.x;
-            const dy = ev.pageY - draggingStartPoint.value.y;
-            positionRef.value.x = draggingStartPosition.value!.x + dx / graph.value.scaling;
-            positionRef.value.y = draggingStartPosition.value!.y + dy / graph.value.scaling;
-        }
-    };
-
     const onPointerUp = (ev?: PointerEvent) => {
         if (captureElement && typeof captureElement.releasePointerCapture === "function") {
             const pid = ev?.pointerId ?? capturePointerId;
@@ -59,8 +53,29 @@ export function useDragMove(positionRef: Ref<IPosition>) {
         }
         captureElement = null;
         capturePointerId = null;
+        passedThreshold = false;
         draggingStartPoint.value = null;
         draggingStartPosition.value = null;
+    };
+
+    const onPointerMove = (ev: PointerEvent) => {
+        const start = draggingStartPoint.value;
+        if (!start || !draggingStartPosition.value) {
+            return;
+        }
+        const decision = decideDragPointerMove(ev, start, passedThreshold);
+        if (decision === "end") {
+            onPointerUp(ev);
+            return;
+        }
+        if (decision === "ignore") {
+            return;
+        }
+        passedThreshold = true;
+        const dx = ev.pageX - start.x;
+        const dy = ev.pageY - start.y;
+        positionRef.value.x = draggingStartPosition.value.x + dx / graph.value.scaling;
+        positionRef.value.y = draggingStartPosition.value.y + dy / graph.value.scaling;
     };
 
     return { dragging, onPointerDown, onPointerMove, onPointerUp };
