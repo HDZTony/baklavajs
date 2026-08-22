@@ -110,8 +110,13 @@ const updateCanvas = () => {
     // draw connections
     ctx.strokeStyle = "white";
     for (const c of graph.value.connections) {
-        const [origX1, origY1] = getPortCoordinates(getDomElements(c.from));
-        const [origX2, origY2] = getPortCoordinates(getDomElements(c.to));
+        const fromPt = getPortCoordinates(getDomElements(c.from));
+        const toPt = getPortCoordinates(getDomElements(c.to));
+        if (!fromPt || !toPt) {
+            continue;
+        }
+        const [origX1, origY1] = fromPt;
+        const [origX2, origY2] = toPt;
         const [x1, y1] = transformCoordinates(origX1, origY1);
         const [x2, y2] = transformCoordinates(origX2, origY2);
         ctx.beginPath();

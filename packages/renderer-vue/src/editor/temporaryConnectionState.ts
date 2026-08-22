@@ -39,6 +39,7 @@ export type TemporaryMouseUpAction =
 
 /**
  * Decide how pointerdown should affect an in-progress or new temporary connection.
+ * Empty-canvas pointerdown cancels an in-progress rubber-band so a lost pointerup cannot leave a void line.
  */
 export function resolveTemporaryMouseDownAction(
     hoveringOver: NodeInterface | null,
@@ -47,7 +48,7 @@ export function resolveTemporaryMouseDownAction(
     awaitingClickTarget: boolean,
 ): TemporaryMouseDownAction {
     if (!hoveringOver) {
-        return "ignore";
+        return hasTemporaryConnection ? "cancel" : "ignore";
     }
     if (!hasTemporaryConnection) {
         return "create";

@@ -1,5 +1,6 @@
 <template>
     <connection-view
+        v-if="d"
         :x1="d.input[0]"
         :y1="d.input[1]"
         :x2="d.output[0]"
@@ -10,12 +11,13 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, Ref } from "vue";
+import { computed, defineComponent, inject, nextTick, onMounted, ref, Ref } from "vue";
 
 import ConnectionView from "./ConnectionView.vue";
 import { ITemporaryConnection, TemporaryConnectionState } from "./connection";
 import { getDomElements } from "./domResolver";
-import { getPortCoordinates } from "./portCoordinates";
+import { getPortCoordinates, resolveTemporaryConnectionPaint } from "./portCoordinates";
+import { useTemporaryConnection } from "../editor/temporaryConnection";
 
 export default defineComponent({
     components: {
@@ -33,36 +35,45 @@ export default defineComponent({
             throw new Error("TemporaryConnection must be used within a BaklavaEditor");
         }
 
+        const { cancelTemporaryConnection } = useTemporaryConnection();
+        const layoutEpoch = ref(0);
+
         const status = computed(() => (props.connection ? props.connection.status : TemporaryConnectionState.NONE));
 
-        const d = computed(() => {
+        const readPaint = () => {
             if (!props.connection) {
-                return {
-                    input: [0, 0],
-                    output: [0, 0]
-                };
+                return null;
             }
-
             const root = editorEl.value;
             if (!root) {
-                throw new Error("BaklavaEditor element is not mounted");
+                return null;
             }
             const start = getPortCoordinates(getDomElements(props.connection.from, root));
-            const end = props.connection.to
+            const endFromPort = props.connection.to
                 ? getPortCoordinates(getDomElements(props.connection.to, root))
-                : [props.connection.mx ?? start[0], props.connection.my ?? start[1]];
+                : null;
+            return resolveTemporaryConnectionPaint(
+                start,
+                endFromPort,
+                props.connection.mx,
+                props.connection.my,
+                props.connection.from.isInput === true,
+            );
+        };
 
-            if (props.connection.from.isInput) {
-                return {
-                    input: end,
-                    output: start
-                };
-            } else {
-                return {
-                    input: start,
-                    output: end
-                };
-            }
+        const d = computed(() => {
+            void layoutEpoch.value;
+            return readPaint();
+        });
+
+        onMounted(() => {
+            void nextTick(() => {
+                if (readPaint() === null) {
+                    cancelTemporaryConnection();
+                    return;
+                }
+                layoutEpoch.value += 1;
+            });
         });
 
         return { d, status };

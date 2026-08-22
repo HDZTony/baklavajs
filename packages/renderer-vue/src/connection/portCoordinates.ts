@@ -1,6 +1,8 @@
 import type { IResolvedDomElements } from "./domResolver";
 
-export function getPortCoordinates(resolved: IResolvedDomElements): [number, number] {
+export type PortPoint = [number, number];
+
+export function getPortCoordinates(resolved: IResolvedDomElements): PortPoint | null {
     if (resolved.node && resolved.interface && resolved.port) {
         let x = resolved.port.offsetLeft + resolved.port.clientWidth / 2;
         let y = resolved.port.offsetTop + resolved.port.clientHeight / 2;
@@ -14,7 +16,28 @@ export function getPortCoordinates(resolved: IResolvedDomElements): [number, num
         x += resolved.node.offsetLeft;
         y += resolved.node.offsetTop;
         return [x, y];
-    } else {
-        return [0, 0];
     }
+    return null;
+}
+
+/**
+ * Temporary-connection paint in graph space.
+ * Returns null when the source port is unresolved — never paint at the graph origin.
+ */
+export function resolveTemporaryConnectionPaint(
+    start: PortPoint | null,
+    endFromPort: PortPoint | null,
+    mx: number | undefined,
+    my: number | undefined,
+    fromIsInput: boolean,
+): { input: PortPoint; output: PortPoint } | null {
+    if (!start) {
+        return null;
+    }
+    const end: PortPoint =
+        endFromPort ?? (mx !== undefined && my !== undefined ? [mx, my] : start);
+    if (fromIsInput) {
+        return { input: end, output: start };
+    }
+    return { input: start, output: end };
 }

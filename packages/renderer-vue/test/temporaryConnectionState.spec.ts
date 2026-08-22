@@ -43,8 +43,13 @@ describe("resolveTemporaryMouseDownAction", () => {
         expect(resolveTemporaryMouseDownAction(source, false, null, false)).toBe("create");
     });
 
-    it("ignores pointerdown when not hovering a port", () => {
+    it("ignores pointerdown when not hovering a port and no temporary connection exists", () => {
         expect(resolveTemporaryMouseDownAction(null, false, null, false)).toBe("ignore");
+    });
+
+    it("cancels an in-progress temporary connection on empty-canvas pointerdown", () => {
+        expect(resolveTemporaryMouseDownAction(null, true, source, false)).toBe("cancel");
+        expect(resolveTemporaryMouseDownAction(null, true, source, true)).toBe("cancel");
     });
 
     it("cancels when clicking the same source port while awaiting click target", () => {
